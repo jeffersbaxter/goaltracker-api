@@ -1,36 +1,19 @@
-// // ============================================
-// // routes/userRoutes.js
-// // ============================================
-
-// const express = require('express');
-// const router = express.Router();
-// const userController = require('../controllers/userController');
-
-// router.post('/login', userController.loginUser); // Add this line
-// router.get('/', userController.getAllUsers);
-// router.get('/:id', userController.getUserById);
-// router.post('/', userController.createUser);
-// router.put('/:id', userController.updateUser);
-// router.delete('/:id', userController.deleteUser);
-
-// module.exports = router;
-
 const express = require('express');
 const router = express.Router();
 const userController = require('../controllers/userController');
+const authMiddleware = require('../middleware/auth');
 const goalController = require('../controllers/goalController');
 
 // User routes
 router.post('/login', userController.loginUser);
-router.get('/', userController.getAllUsers);
-router.get('/:id', userController.getUserById);
+router.post('/refresh', userController.refreshToken);
 router.post('/', userController.createUser);
-router.put('/:id', userController.updateUser);
-router.delete('/:id', userController.deleteUser);
 
-// User-specific goal routes (add these)
-router.get('/:userId/goals', goalController.getUserGoals);
-router.get('/:userId/goals/root', goalController.getRootGoals);
-router.get('/:userId/goals/tree', goalController.getGoalTree);
+// Protected routes (require authentication)
+router.post('/logout', authMiddleware, userController.logoutUser);
+router.get('/me', authMiddleware, userController.getCurrentUser);
+router.get('/:id', authMiddleware, userController.getUserById);
+router.put('/:id', authMiddleware, userController.updateUser);
+router.delete('/:id', authMiddleware, userController.deleteUser);
 
 module.exports = router;

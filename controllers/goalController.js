@@ -21,26 +21,32 @@ const checkAndResetGoals = async (goals) => {
 exports.getUserGoals = async (req, res) => {
   try {
     const { includeArchived, timeframe, goalDirection } = req.query;
+    
+    // Verify the requesting user has access to this user's goals
+    if (req.userId !== req.params.userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
     const filter = { userId: req.params.userId };
-
+    
     if (includeArchived !== 'true') {
       filter.isArchived = false;
       filter.isActive = true;
     }
-
+    
     if (timeframe) {
       filter.timeframe = timeframe;
     }
-
+    
     if (goalDirection) {
       filter.goalDirection = goalDirection;
     }
 
     const goals = await Goal.find(filter).sort({ created: -1 });
-
+    
     // Check and reset all goals before returning
     await checkAndResetGoals(goals);
-
+    
     res.json(goals);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -52,8 +58,13 @@ exports.getUserGoals = async (req, res) => {
 // @access  Private
 exports.getRootGoals = async (req, res) => {
   try {
+    // Verify the requesting user has access to this user's goals
+    if (req.userId !== req.params.userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
     const goals = await Goal.findRootGoals(req.params.userId);
-
+    
     // Check and reset all goals before returning
     await checkAndResetGoals(goals);
     
@@ -67,7 +78,12 @@ exports.getRootGoals = async (req, res) => {
 // @route   GET /api/protected/users/:userId/goals/tree
 // @access  Private
 exports.getGoalTree = async (req, res) => {
-  try {    
+  try {
+    // Verify the requesting user has access to this user's goals
+    if (req.userId !== req.params.userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
     const goalTree = await Goal.findGoalTree(req.params.userId);
     
     // Check and reset all goals before returning
@@ -89,7 +105,12 @@ exports.getGoalById = async (req, res) => {
     if (!goal) {
       return res.status(404).json({ error: 'Goal not found' });
     }
-
+    
+    // Verify the requesting user owns this goal
+    if (goal.userId.toString() !== req.userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
     // Check and reset before returning
     if (goal.resetFrequency !== 'never') {
       const wasReset = goal.checkReset();
@@ -114,7 +135,12 @@ exports.getSubgoals = async (req, res) => {
     if (!parentGoal) {
       return res.status(404).json({ error: 'Parent goal not found' });
     }
-
+    
+    // Verify the requesting user owns this goal
+    if (parentGoal.userId.toString() !== req.userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
     const subgoals = await Goal.findSubgoals(req.params.id);
     
     // Check and reset all subgoals before returning
@@ -143,6 +169,9 @@ exports.createGoal = async (req, res) => {
       if (!parentGoal) {
         return res.status(404).json({ error: 'Parent goal not found' });
       }
+      if (parentGoal.userId.toString() !== req.userId) {
+        return res.status(403).json({ error: 'Access denied to parent goal' });
+      }
     }
     
     const goal = await Goal.create(goalData);
@@ -162,9 +191,14 @@ exports.updateGoal = async (req, res) => {
     if (!goal) {
       return res.status(404).json({ error: 'Goal not found' });
     }
-
+    
+    // Verify the requesting user owns this goal
+    if (goal.userId.toString() !== req.userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
     // Don't allow changing userId
-    // delete req.body.userId;
+    delete req.body.userId;
     
     const updatedGoal = await Goal.findByIdAndUpdate(
       req.params.id,
@@ -188,6 +222,11 @@ exports.logProgress = async (req, res) => {
 
     if (!goal) {
       return res.status(404).json({ error: 'Goal not found' });
+    }
+
+    // Verify the requesting user owns this goal
+    if (goal.userId.toString() !== req.userId) {
+      return res.status(403).json({ error: 'Access denied' });
     }
 
     // This will check for reset and log progress
@@ -216,6 +255,11 @@ exports.manualScale = async (req, res) => {
       return res.status(404).json({ error: 'Goal not found' });
     }
 
+    // Verify the requesting user owns this goal
+    if (goal.userId.toString() !== req.userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
     await goal.manualScale(direction);
     
     res.json(goal);
@@ -233,6 +277,11 @@ exports.toggleArchive = async (req, res) => {
 
     if (!goal) {
       return res.status(404).json({ error: 'Goal not found' });
+    }
+
+    // Verify the requesting user owns this goal
+    if (goal.userId.toString() !== req.userId) {
+      return res.status(403).json({ error: 'Access denied' });
     }
 
     goal.isArchived = !goal.isArchived;
@@ -254,7 +303,12 @@ exports.deleteGoal = async (req, res) => {
     if (!goal) {
       return res.status(404).json({ error: 'Goal not found' });
     }
-
+    
+    // Verify the requesting user owns this goal
+    if (goal.userId.toString() !== req.userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
     const result = await Goal.deleteGoalAndSubgoals(req.params.id);
 
     res.json({ 

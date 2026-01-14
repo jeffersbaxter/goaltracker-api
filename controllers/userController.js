@@ -1,9 +1,6 @@
-// ============================================
-// controllers/userController.js
-// ============================================
-
 const User = require('../models/User');
 const bcrypt = require('bcrypt');
+const { generateAccessToken, generateRefreshToken } = require('../utils/auth');
 
 // @desc    Get all users
 // @route   GET /api/users
@@ -141,6 +138,25 @@ exports.loginUser = async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
+    // Generate tokens
+    const accessToken = generateAccessToken(user._id);
+    const refreshToken = generateRefreshToken(user._id);
+
+    // Set httpOnly cookies
+    res.cookie('accessToken', accessToken, {
+      httpOnly: true,           // Prevents JavaScript access
+      secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+      sameSite: 'strict',       // CSRF protection
+      maxAge: 15 * 60 * 1000    // 15 minutes
+    });
+
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000  // 7 days
+    });
+
     // Return user without password
     const userResponse = user.toObject();
     delete userResponse.password;
@@ -149,6 +165,74 @@ exports.loginUser = async (req, res) => {
       message: 'Login successful',
       user: userResponse
     });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// @desc    Refresh access token
+// @route   POST /api/users/refresh
+// @access  Public
+exports.refreshToken = async (req, res) => {
+  try {
+    const { refreshToken } = req.cookies;
+
+    if (!refreshToken) {
+      return res.status(401).json({ error: 'Refresh token required' });
+    }
+
+    // Verify refresh token
+    const { verifyRefreshToken, generateAccessToken } = require('../utils/auth');
+    const decoded = verifyRefreshToken(refreshToken);
+
+    if (!decoded) {
+      return res.status(401).json({ error: 'Invalid refresh token' });
+    }
+
+    // Generate new access token
+    const newAccessToken = generateAccessToken(decoded.userId);
+
+    // Set new access token cookie
+    res.cookie('accessToken', newAccessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 15 * 60 * 1000
+    });
+
+    res.json({ message: 'Token refreshed successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// @desc    Logout user
+// @route   POST /api/users/logout
+// @access  Private
+exports.logoutUser = async (req, res) => {
+  try {
+    // Clear cookies
+    res.clearCookie('accessToken');
+    res.clearCookie('refreshToken');
+
+    res.json({ message: 'Logged out successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// @desc    Get current user
+// @route   GET /api/users/me
+// @access  Private
+exports.getCurrentUser = async (req, res) => {
+  try {
+    const user = await User.findById(req.userId).select('-password');
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json(user);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
