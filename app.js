@@ -1,10 +1,12 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const cookieParser = require('cookie-parser'); // ✅ ADD THIS
 const mongoose = require('mongoose');
 const { connectDB } = require('./config/database');
 const userRoutes = require('./routes/userRoutes');
 const goalRoutes = require('./routes/goalRoutes');
+const protectedUserRoutes = require('./routes/protectedUserRoutes');
 
 const app = express();
 
@@ -44,8 +46,11 @@ app.use(cors({
 }));
 
 // Body parsing middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// ✅ Cookie parser middleware
+app.use(cookieParser());
 
 // Request logging middleware (only in development)
 if (process.env.NODE_ENV !== 'production') {
@@ -63,6 +68,7 @@ connectDB().catch(err => {
 
 // Routes
 app.use('/api/users', userRoutes);
+app.use('/api/protected/users', protectedUserRoutes); // Protected user routes
 app.use('/api/goals', goalRoutes);
 
 // Root route
