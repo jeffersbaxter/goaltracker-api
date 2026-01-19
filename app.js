@@ -20,7 +20,8 @@ const allowedOrigins = [
 
 // Add Vercel preview and production URLs
 if (process.env.NODE_ENV === 'production') {
-  allowedOrigins.push('https://goaltracker-frontend.vercel.app');
+  allowedOrigins.push('https://goal-tracker-three-mocha.vercel.app/');
+  allowedOrigins.push(/\*/);
   allowedOrigins.push(/\.vercel\.app$/); // Allow all Vercel preview deployments
 }
 
@@ -34,6 +35,7 @@ app.use(cors({
       if (allowed instanceof RegExp) return allowed.test(origin);
       return false;
     })) {
+      console.log(origin);
       callback(null, true);
     } else {
       console.log('Blocked by CORS:', origin);
